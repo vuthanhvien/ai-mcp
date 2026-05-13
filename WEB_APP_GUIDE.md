@@ -155,6 +155,12 @@ Start server again:
 .\.venv\Scripts\python.exe server.py http
 ```
 
+Or use the Bash/Git Bash helper:
+
+```bash
+./start_http.sh
+```
+
 Start quick tunnel again:
 
 ```powershell
