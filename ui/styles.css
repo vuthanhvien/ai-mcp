@@ -255,6 +255,15 @@ summary {
   font-weight: 750;
 }
 
+.guide-note {
+  padding: 10px;
+  border: 1px solid rgba(22, 108, 121, 0.18);
+  border-radius: 8px;
+  background: rgba(22, 108, 121, 0.08);
+  color: var(--primary-dark);
+  line-height: 1.45;
+}
+
 .guide-block code,
 details pre {
   display: block;

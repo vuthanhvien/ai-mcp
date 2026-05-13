@@ -12,7 +12,7 @@
         <div class="brand">
           <div class="mark">AI</div>
           <div>
-            <h1>AI MCP Chat</h1>
+            <h1>Local Agent Chat</h1>
             <p>Chatbot nhập liệu với tool API</p>
           </div>
         </div>
@@ -64,9 +64,14 @@
             <button id="refreshGuide" type="button" class="secondary compact">Refresh</button>
           </div>
 
+          <p class="guide-note">
+            App khac chi can goi Local Agent API nay. Khong can goi Claude API:
+            Ollama local se doc user message, tu quyet dinh tool call, roi tra ket qua.
+          </p>
+
           <div class="guide-block">
             <div class="guide-row">
-              <span>Chat stream</span>
+              <span>Local chat stream</span>
               <button type="button" class="copy-button" data-copy-target="streamEndpoint">Copy</button>
             </div>
             <code id="streamEndpoint"></code>
@@ -74,7 +79,7 @@
 
           <div class="guide-block">
             <div class="guide-row">
-              <span>MCP endpoint</span>
+              <span>MCP endpoint cho MCP client</span>
               <button type="button" class="copy-button" data-copy-target="mcpEndpoint">Copy</button>
             </div>
             <code id="mcpEndpoint"></code>
@@ -97,11 +102,19 @@
           </details>
 
           <details>
-            <summary>Fetch streaming example</summary>
+            <summary>Backend proxy example</summary>
             <button type="button" class="copy-button inline-copy" data-copy-target="fetchExample">
               Copy code
             </button>
             <pre id="fetchExample"></pre>
+          </details>
+
+          <details>
+            <summary>Tool wiring example</summary>
+            <button type="button" class="copy-button inline-copy" data-copy-target="toolExample">
+              Copy code
+            </button>
+            <pre id="toolExample"></pre>
           </details>
         </section>
       </aside>

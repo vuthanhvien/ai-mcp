@@ -5,6 +5,22 @@ This server exposes two public surfaces:
 - MCP endpoint: `/mcp`
 - Simple chatbot REST API for web apps: `/api/chat`
 
+## Local Agent Direction
+
+The main flow is:
+
+```text
+Your web app/chat UI
+  -> this Local Agent API (/api/chat/stream)
+  -> local Ollama model
+  -> local tool functions in server.py
+  -> your business APIs, database, files, etc.
+```
+
+This means your chatbot app does not need to call Claude/OpenAI for tool use.
+Claude/Codex/MCP clients are optional. The cheap/default path is your app calling
+this server, while Ollama local decides when to call tools.
+
 ## Current Public URL
 
 Quick Cloudflare Tunnel:
@@ -98,15 +114,15 @@ For conversation history, send `messages` instead of `message`:
 ## JavaScript Backend Example
 
 ```js
-const MCP_BASE_URL = process.env.MCP_BASE_URL;
-const MCP_API_KEY = process.env.MCP_API_KEY;
+const LOCAL_AGENT_BASE_URL = process.env.LOCAL_AGENT_BASE_URL;
+const LOCAL_AGENT_API_KEY = process.env.LOCAL_AGENT_API_KEY;
 
 export async function askDataEntryBot(message, history = []) {
-  const res = await fetch(`${MCP_BASE_URL}/api/chat`, {
+  const res = await fetch(`${LOCAL_AGENT_BASE_URL}/api/chat/stream`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-API-Key": MCP_API_KEY,
+      "X-API-Key": LOCAL_AGENT_API_KEY,
     },
     body: JSON.stringify({
       messages: [...history, { role: "user", content: message }],
@@ -119,9 +135,108 @@ export async function askDataEntryBot(message, history = []) {
     throw new Error(await res.text());
   }
 
-  return res.json();
+  return res.body;
 }
 ```
+
+## Add Your Own Tool Example
+
+### Option A: Send Dynamic Tools Per Request
+
+Your other chatbot can send a tool list directly to this Local Agent. The agent
+will expose those tools to Ollama, let Ollama choose, then call the configured
+HTTP API.
+
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Tao email voi title la Title" }
+  ],
+  "system": "Neu user muon tao email, hay dung create_mail.",
+  "dynamic_tools": [
+    {
+      "name": "create_mail",
+      "description": "Create an email draft in my app.",
+      "method": "POST",
+      "url": "https://your-app.example.com/mails",
+      "headers": {
+        "Authorization": "Bearer YOUR_APP_API_KEY"
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "description": "Email title" },
+          "body": { "type": "string", "description": "Email body" },
+          "to": { "type": "string", "description": "Recipient email" }
+        },
+        "required": ["title"]
+      }
+    }
+  ]
+}
+```
+
+Dynamic tool behavior:
+
+- `POST`, `PUT`, `PATCH`: tool arguments are sent as JSON body.
+- `GET`, `DELETE`: tool arguments are sent as query params.
+- The request still requires `X-API-Key` for this Local Agent.
+- Only send dynamic tools from trusted backends, because the agent will call the URLs you provide.
+
+### Option B: Hardcode A Stable Tool
+
+Example goal:
+
+```text
+User: Tao email voi title la Title
+```
+
+You add a local tool in `server.py`. Ollama will decide to call it, and the tool
+will call your own API:
+
+```python
+@mcp.tool()
+async def create_mail(title: str, body: str = "", to: str = "") -> str:
+    """Create an email draft in my app."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            "https://your-app.example.com/mails",
+            headers={"Authorization": "Bearer YOUR_APP_API_KEY"},
+            json={"title": title, "body": body, "to": to},
+        )
+        resp.raise_for_status()
+        return resp.text
+```
+
+Then register it in two places:
+
+```python
+TOOL_FUNCTIONS["create_mail"] = create_mail
+```
+
+and add an `OLLAMA_TOOL_SPECS` entry:
+
+```python
+{
+    "type": "function",
+    "function": {
+        "name": "create_mail",
+        "description": "Create an email draft in the user's mail app.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "body": {"type": "string"},
+                "to": {"type": "string"}
+            },
+            "required": ["title"]
+        }
+    }
+}
+```
+
+After restart, `/api/tools` will show `create_mail`, and `/api/chat/stream`
+can call it automatically.
 
 ## Frontend Example
 

@@ -260,7 +260,89 @@ OLLAMA_TOOL_SPECS = [
 ]
 
 
-async def invoke_tool(name: str, args: dict) -> str:
+def normalize_dynamic_tools(raw_tools) -> tuple[list[dict], dict[str, dict]]:
+    if not isinstance(raw_tools, list):
+        return [], {}
+
+    specs = []
+    tool_map = {}
+    for raw in raw_tools:
+        if not isinstance(raw, dict):
+            continue
+
+        name = str(raw.get("name", "")).strip()
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$", name):
+            continue
+
+        method = str(raw.get("method", "POST")).upper()
+        url = str(raw.get("url", "")).strip()
+        if method not in {"GET", "POST", "PUT", "PATCH", "DELETE"} or not url:
+            continue
+
+        parameters = raw.get("parameters") or {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        }
+        if not isinstance(parameters, dict):
+            parameters = {"type": "object", "properties": {}, "required": []}
+
+        description = str(raw.get("description") or f"Call {method} {url}")
+        spec = {
+            "type": "function",
+            "function": {
+                "name": name,
+                "description": description,
+                "parameters": {
+                    "type": parameters.get("type", "object"),
+                    "properties": parameters.get("properties", {}),
+                    "required": parameters.get("required", []),
+                },
+            },
+        }
+        specs.append(spec)
+        tool_map[name] = {
+            "name": name,
+            "description": description,
+            "method": method,
+            "url": url,
+            "headers": raw.get("headers") if isinstance(raw.get("headers"), dict) else {},
+            "timeout": float(raw.get("timeout", 30)),
+        }
+
+    return specs, tool_map
+
+
+async def invoke_dynamic_tool(spec: dict, args: dict) -> str:
+    method = spec["method"]
+    request_kwargs = {
+        "headers": spec.get("headers") or {},
+        "timeout": spec.get("timeout", 30),
+    }
+    if method in {"GET", "DELETE"}:
+        request_kwargs["params"] = args
+    else:
+        request_kwargs["json"] = args
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.request(method, spec["url"], **request_kwargs)
+        text = resp.text
+        if resp.status_code >= 400:
+            return f"HTTP {resp.status_code}: {text[:2000]}"
+        try:
+            return json.dumps(resp.json(), ensure_ascii=False)
+        except Exception:
+            return text
+
+
+async def invoke_tool(name: str, args: dict, dynamic_tool_map: dict | None = None) -> str:
+    dynamic_tool_map = dynamic_tool_map or {}
+    if name in dynamic_tool_map:
+        try:
+            return await invoke_dynamic_tool(dynamic_tool_map[name], args)
+        except Exception as ex:
+            return f"Error calling dynamic tool: {ex}"
+
     func = TOOL_FUNCTIONS.get(name)
     if not func:
         return f"Error: unknown tool '{name}'"
@@ -341,7 +423,14 @@ async def api_chat(request: Request) -> JSONResponse:
         ),
     )
     max_tool_rounds = int(body.get("max_tool_rounds", 4))
-    enable_tools = body.get("tools", True)
+    tool_setting = body.get("tools", True)
+    dynamic_tools = body.get("dynamic_tools", [])
+    if isinstance(tool_setting, list):
+        dynamic_tools = tool_setting
+        enable_tools = True
+    else:
+        enable_tools = bool(tool_setting)
+    dynamic_tool_specs, dynamic_tool_map = normalize_dynamic_tools(dynamic_tools)
 
     if messages is None:
         if not message:
@@ -351,7 +440,7 @@ async def api_chat(request: Request) -> JSONResponse:
         messages = [{"role": "user", "content": str(message)}]
 
     conversation = [{"role": "system", "content": system}, *messages]
-    available_tools = OLLAMA_TOOL_SPECS if enable_tools else []
+    available_tools = [*OLLAMA_TOOL_SPECS, *dynamic_tool_specs] if enable_tools else []
     tool_trace = []
 
     try:
@@ -372,7 +461,7 @@ async def api_chat(request: Request) -> JSONResponse:
                 fn = call["function"]
                 raw_args = fn.get("arguments", "{}")
                 args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-                output = await invoke_tool(fn["name"], args or {})
+                output = await invoke_tool(fn["name"], args or {}, dynamic_tool_map)
                 tool_trace.append({"name": fn["name"], "arguments": args, "output": output})
                 conversation.append(
                     {
@@ -413,7 +502,14 @@ async def api_chat_stream(request: Request) -> StreamingResponse:
         ),
     )
     max_tool_rounds = int(body.get("max_tool_rounds", 4))
-    enable_tools = body.get("tools", True)
+    tool_setting = body.get("tools", True)
+    dynamic_tools = body.get("dynamic_tools", [])
+    if isinstance(tool_setting, list):
+        dynamic_tools = tool_setting
+        enable_tools = True
+    else:
+        enable_tools = bool(tool_setting)
+    dynamic_tool_specs, dynamic_tool_map = normalize_dynamic_tools(dynamic_tools)
 
     if messages is None:
         if not message:
@@ -426,7 +522,7 @@ async def api_chat_stream(request: Request) -> StreamingResponse:
 
     async def event_generator():
         conversation = [{"role": "system", "content": system}, *messages]
-        available_tools = OLLAMA_TOOL_SPECS if enable_tools else []
+        available_tools = [*OLLAMA_TOOL_SPECS, *dynamic_tool_specs] if enable_tools else []
         answer_parts = []
 
         try:
@@ -452,7 +548,7 @@ async def api_chat_stream(request: Request) -> StreamingResponse:
                     raw_args = fn.get("arguments", "{}")
                     args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
                     yield stream_event("tool_call", name=fn["name"], arguments=args or {})
-                    output = await invoke_tool(fn["name"], args or {})
+                    output = await invoke_tool(fn["name"], args or {}, dynamic_tool_map)
                     yield stream_event(
                         "tool_result",
                         name=fn["name"],

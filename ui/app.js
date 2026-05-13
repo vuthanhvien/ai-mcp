@@ -28,6 +28,7 @@ const els = {
   authHeader: $("authHeader"),
   mcpConfig: $("mcpConfig"),
   fetchExample: $("fetchExample"),
+  toolExample: $("toolExample"),
 };
 
 let history = [];
@@ -93,21 +94,28 @@ function updateConnectGuide() {
     null,
     2,
   );
-  els.fetchExample.textContent = `const res = await fetch("${values.streamUrl}", {
+  els.fetchExample.textContent = `// Put this in your web app backend, not directly in browser code.
+// Your backend calls this Local Agent API. Ollama local handles tool calling.
+const LOCAL_AGENT_URL = "${values.streamUrl}";
+const LOCAL_AGENT_KEY = "${values.apiKey}";
+
+export async function askLocalAgent(message, history = []) {
+  const res = await fetch(LOCAL_AGENT_URL, {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "X-API-Key": "${values.apiKey}"
+    "X-API-Key": LOCAL_AGENT_KEY
   },
   body: JSON.stringify({
-    messages: [{ role: "user", content: "Tao phieu nhap kho cho 50 ban phim" }],
-    system: "You are a Vietnamese data-entry assistant."
+    messages: [...history, { role: "user", content: message }],
+    system: "You are a Vietnamese data-entry assistant. Use tools when useful."
   })
 });
 
 const reader = res.body.getReader();
 const decoder = new TextDecoder();
 let buffer = "";
+let answer = "";
 
 while (true) {
   const { value, done } = await reader.read();
@@ -118,10 +126,48 @@ while (true) {
   for (const line of lines) {
     if (!line.trim()) continue;
     const event = JSON.parse(line);
-    if (event.type === "delta") console.log(event.text);
+    if (event.type === "delta") answer += event.text;
     if (event.type === "tool_result") console.log("tool", event.name, event.output);
   }
+}
+
+return answer;
 }`;
+  els.toolExample.textContent = `// Chatbot ben kia co the gui tool list moi request.
+// Local Agent doc schema, de Ollama chon tool, roi tu call API.
+const res = await fetch("${values.streamUrl}", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "${values.apiKey}"
+  },
+  body: JSON.stringify({
+    messages: [
+      { role: "user", content: "Tao email voi title la Title" }
+    ],
+    system: "Neu user muon tao email, hay dung create_mail.",
+    dynamic_tools: [
+      {
+        name: "create_mail",
+        description: "Create an email draft in my app.",
+        method: "POST",
+        url: "https://your-app.example.com/mails",
+        headers: {
+          "Authorization": "Bearer YOUR_APP_API_KEY"
+        },
+        parameters: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "Email title" },
+            body: { type: "string", description: "Email body" },
+            to: { type: "string", description: "Recipient email" }
+          },
+          required: ["title"]
+        }
+      }
+    ]
+  })
+});`;
 }
 
 async function copyTextById(id, button) {
