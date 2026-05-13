@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.claude\" -ErrorAction SilentlyContinue | Select-Object Name, FullName)",
+      "PowerShell(Get-ChildItem \"$env:APPDATA\\\\Claude\" -ErrorAction SilentlyContinue | Select-Object Name; Get-ChildItem \"$env:USERPROFILE\\\\.claude\" -ErrorAction SilentlyContinue | Select-Object Name)",
+      "PowerShell(Test-Path \"$env:USERPROFILE\\\\.claude\"; Test-Path \"$env:APPDATA\\\\Claude\"; Get-ChildItem \"$env:LOCALAPPDATA\\\\Claude\" -ErrorAction SilentlyContinue | Select-Object Name)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.claude\" | Select-Object Name, FullName)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.claude\" -Force | Select-Object Name, FullName)",
+      "Bash(cat \"C:/Users/Admin/.claude/settings.json\" 2>/dev/null || echo \"FILE_NOT_FOUND\")",
+      "Read(//c/Users/Admin/.claude/**)",
+      "PowerShell(try { $r = Invoke-RestMethod \"http://localhost:11434/api/tags\" -TimeoutSec 3; \"Ollama running. Models: \" + \\($r.models | ForEach-Object { $_.name } | Join-String -Separator \", \"\\) } catch { \"Ollama not running: $_\" })",
+      "PowerShell(try { $r = Invoke-RestMethod \"http://localhost:11434/api/tags\" -TimeoutSec 3; \"Ollama running. Models: \" + \\(\\($r.models | ForEach-Object { $_.name }\\) -join \", \"\\) } catch { \"Ollama not running\" })",
+      "PowerShell($key = [System.Convert]::ToBase64String\\(\\(1..32 | ForEach-Object { [byte]\\(Get-Random -Max 256\\) }\\)\\); Write-Output $key)",
+      "PowerShell(winget install Cloudflare.cloudflared --accept-package-agreements --accept-source-agreements 2>&1)",
+      "PowerShell(cloudflared --version)",
+      "PowerShell(Get-ChildItem \"$env:LOCALAPPDATA\\\\Microsoft\\\\WinGet\" -Recurse -Filter \"cloudflared.exe\" -ErrorAction SilentlyContinue | Select-Object FullName)",
+      "PowerShell(cd \"d:\\\\work\\\\ai-mcp\"; powershell -File start_http.ps1 2>&1 | Select-Object -First 20)",
+      "PowerShell(cd \"d:\\\\work\\\\ai-mcp\"; $env:PYTHONUTF8=\"1\"; .\\\\.venv\\\\Scripts\\\\python.exe test_mcp.py stdio 2>&1 | Where-Object { $_ -notmatch \"^\\(\\\\s+INFO|\\\\s+WARNING\\)\" })",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8001 -State Listen -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Job)",
+      "Bash(awk '{print $2}')"
+    ]
+  }
+}
