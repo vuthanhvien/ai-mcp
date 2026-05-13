@@ -12,6 +12,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import FileResponse
 from starlette.responses import JSONResponse
+from starlette.responses import StreamingResponse
 from starlette.staticfiles import StaticFiles
 from mcp.server.fastmcp import FastMCP
 
@@ -282,6 +283,37 @@ async def ollama_chat(messages: list[dict], model: str, tools: list[dict]) -> di
         return resp.json()["choices"][0]["message"]
 
 
+async def stream_ollama_text(messages: list[dict], model: str):
+    payload = {"model": model, "messages": messages, "stream": True}
+    async with httpx.AsyncClient(timeout=180) as client:
+        async with client.stream(
+            "POST", f"{OLLAMA_BASE_URL}/v1/chat/completions", json=payload
+        ) as resp:
+            resp.raise_for_status()
+            async for line in resp.aiter_lines():
+                if not line:
+                    continue
+                if line.startswith("data: "):
+                    line = line.removeprefix("data: ").strip()
+                if line == "[DONE]":
+                    break
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                choices = data.get("choices") or []
+                if not choices:
+                    continue
+                delta = choices[0].get("delta") or {}
+                content = delta.get("content")
+                if content:
+                    yield content
+
+
+def stream_event(event_type: str, **payload) -> str:
+    return json.dumps({"type": event_type, **payload}, ensure_ascii=False) + "\n"
+
+
 async def api_tools(request: Request) -> JSONResponse:
     return JSONResponse(
         {
@@ -359,6 +391,95 @@ async def api_chat(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(ex)}, status_code=500)
 
 
+async def api_chat_stream(request: Request) -> StreamingResponse:
+    try:
+        body = await request.json()
+    except Exception:
+        return StreamingResponse(
+            iter([stream_event("error", error="Invalid JSON body")]),
+            status_code=400,
+            media_type="application/x-ndjson",
+        )
+
+    model = body.get("model") or DEFAULT_MODEL
+    message = body.get("message")
+    messages = body.get("messages")
+    system = body.get(
+        "system",
+        (
+            "You are a helpful data-entry assistant. "
+            "Ask concise follow-up questions when required fields are missing. "
+            "Use tools when they help. Reply in the user's language."
+        ),
+    )
+    max_tool_rounds = int(body.get("max_tool_rounds", 4))
+    enable_tools = body.get("tools", True)
+
+    if messages is None:
+        if not message:
+            return StreamingResponse(
+                iter([stream_event("error", error="Provide either 'message' or 'messages'.")]),
+                status_code=400,
+                media_type="application/x-ndjson",
+            )
+        messages = [{"role": "user", "content": str(message)}]
+
+    async def event_generator():
+        conversation = [{"role": "system", "content": system}, *messages]
+        available_tools = OLLAMA_TOOL_SPECS if enable_tools else []
+        answer_parts = []
+
+        try:
+            yield stream_event("status", message="thinking")
+            for _ in range(max_tool_rounds + 1):
+                msg = await ollama_chat(conversation, model, available_tools)
+                tool_calls = msg.get("tool_calls") or []
+                if not tool_calls:
+                    yield stream_event("status", message="streaming")
+                    async for chunk in stream_ollama_text(conversation, model):
+                        answer_parts.append(chunk)
+                        yield stream_event("delta", text=chunk)
+                    yield stream_event(
+                        "done",
+                        answer="".join(answer_parts),
+                        model=model,
+                    )
+                    return
+
+                conversation.append(msg)
+                for call in tool_calls:
+                    fn = call["function"]
+                    raw_args = fn.get("arguments", "{}")
+                    args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                    yield stream_event("tool_call", name=fn["name"], arguments=args or {})
+                    output = await invoke_tool(fn["name"], args or {})
+                    yield stream_event(
+                        "tool_result",
+                        name=fn["name"],
+                        arguments=args or {},
+                        output=output,
+                    )
+                    conversation.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": call.get("id", fn["name"]),
+                            "content": output,
+                        }
+                    )
+
+            yield stream_event("error", error="Too many tool rounds")
+        except httpx.HTTPStatusError as ex:
+            yield stream_event(
+                "error",
+                error="Ollama request failed",
+                detail=ex.response.text,
+            )
+        except Exception as ex:
+            yield stream_event("error", error=str(ex))
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+
+
 async def ui_index(request: Request) -> FileResponse:
     return FileResponse(Path(__file__).parent / "ui" / "index.html")
 
@@ -375,6 +496,7 @@ if __name__ == "__main__":
         app.mount("/ui", StaticFiles(directory=Path(__file__).parent / "ui"), name="ui")
         app.add_route("/api/tools", api_tools, methods=["GET", "OPTIONS"])
         app.add_route("/api/chat", api_chat, methods=["POST", "OPTIONS"])
+        app.add_route("/api/chat/stream", api_chat_stream, methods=["POST", "OPTIONS"])
         app.add_middleware(
             CORSMiddleware,
             allow_origins=CORS_ORIGINS,

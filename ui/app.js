@@ -90,6 +90,28 @@ function appendMessage(role, text, toolCalls = []) {
 
   els.messages.appendChild(node);
   els.messages.scrollTop = els.messages.scrollHeight;
+  return node;
+}
+
+function appendStreamingMessage() {
+  const node = appendMessage("assistant", "");
+  const bubble = node.querySelector(".bubble");
+  const text = document.createElement("span");
+  const trace = document.createElement("div");
+  trace.className = "trace";
+  trace.hidden = true;
+  bubble.textContent = "";
+  bubble.appendChild(text);
+  bubble.appendChild(trace);
+  return { node, text, trace };
+}
+
+function appendTrace(trace, html) {
+  trace.hidden = false;
+  const line = document.createElement("div");
+  line.innerHTML = html;
+  trace.appendChild(line);
+  els.messages.scrollTop = els.messages.scrollHeight;
 }
 
 function escapeHtml(value) {
@@ -142,9 +164,12 @@ async function sendMessage(text) {
   setPending(true);
   appendMessage("user", text);
   history.push({ role: "user", content: text });
+  const live = appendStreamingMessage();
+  let answer = "";
+  const toolCalls = [];
 
   try {
-    const res = await fetch(`${normalizeBaseUrl(els.baseUrl.value)}/api/chat`, {
+    const res = await fetch(`${normalizeBaseUrl(els.baseUrl.value)}/api/chat/stream`, {
       method: "POST",
       headers: getHeaders(),
       body: JSON.stringify({
@@ -157,12 +182,81 @@ async function sendMessage(text) {
       throw new Error(await res.text());
     }
 
-    const data = await res.json();
-    const answer = data.answer || "(Không có phản hồi)";
-    appendMessage("assistant", answer, data.tool_calls || []);
+    if (!res.body) {
+      throw new Error("Streaming is not supported by this browser.");
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line);
+
+        if (event.type === "status") {
+          els.chatSubtext.textContent =
+            event.message === "streaming" ? "Đang trả lời..." : "Đang suy nghĩ...";
+        }
+
+        if (event.type === "tool_call") {
+          appendTrace(
+            live.trace,
+            `<code>${escapeHtml(event.name)}</code> ${escapeHtml(
+              JSON.stringify(event.arguments || {}),
+            )}`,
+          );
+        }
+
+        if (event.type === "tool_result") {
+          toolCalls.push({
+            name: event.name,
+            arguments: event.arguments || {},
+            output: event.output || "",
+          });
+          appendTrace(
+            live.trace,
+            `<code>${escapeHtml(event.name)}</code> -> ${escapeHtml(
+              String(event.output || ""),
+            )}`,
+          );
+        }
+
+        if (event.type === "delta") {
+          answer += event.text || "";
+          live.text.textContent = answer;
+          els.messages.scrollTop = els.messages.scrollHeight;
+        }
+
+        if (event.type === "done") {
+          answer = event.answer || answer;
+          live.text.textContent = answer || "(Không có phản hồi)";
+        }
+
+        if (event.type === "error") {
+          throw new Error(event.detail || event.error || "Stream error");
+        }
+      }
+    }
+
+    if (!answer.trim()) {
+      live.text.textContent = "(Không có phản hồi)";
+    }
+
     history.push({ role: "assistant", content: answer });
-    setStatus("Đã nhận phản hồi", "ok");
+    setStatus(`Đã nhận phản hồi streaming (${toolCalls.length} tool calls)`, "ok");
   } catch (error) {
+    if (!answer) {
+      live.node.remove();
+    }
     appendMessage("system", `Lỗi: ${error.message}`);
     setStatus("Gửi tin nhắn thất bại", "error");
   } finally {
