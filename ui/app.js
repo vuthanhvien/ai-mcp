@@ -22,6 +22,12 @@ const els = {
   clearChat: $("clearChat"),
   chatSubtext: $("chatSubtext"),
   messageTemplate: $("messageTemplate"),
+  refreshGuide: $("refreshGuide"),
+  streamEndpoint: $("streamEndpoint"),
+  mcpEndpoint: $("mcpEndpoint"),
+  authHeader: $("authHeader"),
+  mcpConfig: $("mcpConfig"),
+  fetchExample: $("fetchExample"),
 };
 
 let history = [];
@@ -39,6 +45,7 @@ function saveSettings() {
   localStorage.setItem("mcpChat.apiKey", els.apiKey.value.trim());
   localStorage.setItem("mcpChat.systemPrompt", els.systemPrompt.value.trim());
   els.baseUrl.value = normalizeBaseUrl(els.baseUrl.value);
+  updateConnectGuide();
   setStatus("Đã lưu cấu hình", "ok");
 }
 

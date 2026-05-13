@@ -62,6 +62,27 @@ Response:
 }
 ```
 
+## Streaming Chat API
+
+The UI uses the streaming endpoint:
+
+```http
+POST /api/chat/stream
+Content-Type: application/json
+X-API-Key: your-api-key
+```
+
+It returns newline-delimited JSON events:
+
+```json
+{"type":"status","message":"thinking"}
+{"type":"tool_call","name":"calculator","arguments":{"expression":"8*7"}}
+{"type":"tool_result","name":"calculator","arguments":{"expression":"8*7"},"output":"56"}
+{"type":"delta","text":"8"}
+{"type":"delta","text":" x 7 = 56"}
+{"type":"done","answer":"8 x 7 = 56","model":"qwen3-coder:30b"}
+```
+
 For conversation history, send `messages` instead of `message`:
 
 ```json

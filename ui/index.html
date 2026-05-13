@@ -58,6 +58,52 @@
             <span class="muted">Bấm Test tools để tải danh sách</span>
           </div>
         </section>
+        <section class="connect-guide" aria-label="Connect app khac">
+          <div class="section-title">
+            <h2>Connect app khac</h2>
+            <button id="refreshGuide" type="button" class="secondary compact">Refresh</button>
+          </div>
+
+          <div class="guide-block">
+            <div class="guide-row">
+              <span>Chat stream</span>
+              <button type="button" class="copy-button" data-copy-target="streamEndpoint">Copy</button>
+            </div>
+            <code id="streamEndpoint"></code>
+          </div>
+
+          <div class="guide-block">
+            <div class="guide-row">
+              <span>MCP endpoint</span>
+              <button type="button" class="copy-button" data-copy-target="mcpEndpoint">Copy</button>
+            </div>
+            <code id="mcpEndpoint"></code>
+          </div>
+
+          <div class="guide-block">
+            <div class="guide-row">
+              <span>Header</span>
+              <button type="button" class="copy-button" data-copy-target="authHeader">Copy</button>
+            </div>
+            <code id="authHeader"></code>
+          </div>
+
+          <details>
+            <summary>MCP config JSON</summary>
+            <button type="button" class="copy-button inline-copy" data-copy-target="mcpConfig">
+              Copy config
+            </button>
+            <pre id="mcpConfig"></pre>
+          </details>
+
+          <details>
+            <summary>Fetch streaming example</summary>
+            <button type="button" class="copy-button inline-copy" data-copy-target="fetchExample">
+              Copy code
+            </button>
+            <pre id="fetchExample"></pre>
+          </details>
+        </section>
       </aside>
 
       <section class="chat">
