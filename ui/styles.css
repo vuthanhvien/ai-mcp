@@ -99,9 +99,18 @@ p,
 }
 
 .settings,
-.tools {
+.tools,
+.connect-guide {
   display: grid;
   gap: 12px;
+}
+
+.section-title,
+.guide-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 label {
@@ -174,6 +183,23 @@ button.secondary:hover {
   background: #e9eef3;
 }
 
+button.compact,
+.copy-button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+button.compact:hover,
+.copy-button:hover {
+  background: #e9eef3;
+}
+
 .status {
   min-height: 36px;
   padding: 9px 10px;
@@ -210,6 +236,48 @@ button.secondary:hover {
   color: var(--text);
   font-size: 12px;
   font-weight: 700;
+}
+
+.guide-block,
+details {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.guide-row span,
+summary {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.guide-block code,
+details pre {
+  display: block;
+  max-width: 100%;
+  margin: 0;
+  overflow: auto;
+  border-radius: 8px;
+  color: var(--text);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+details pre {
+  padding: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.inline-copy {
+  width: 100%;
 }
 
 .chat {
