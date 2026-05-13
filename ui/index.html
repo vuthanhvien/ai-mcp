@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI MCP Chat</title>
+    <link rel="stylesheet" href="/ui/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="panel">
+        <div class="brand">
+          <div class="mark">AI</div>
+          <div>
+            <h1>AI MCP Chat</h1>
+            <p>Chatbot nhập liệu với tool API</p>
+          </div>
+        </div>
+
+        <section class="settings" aria-label="Cấu hình API">
+          <label>
+            API base URL
+            <input
+              id="baseUrl"
+              autocomplete="url"
+              spellcheck="false"
+              placeholder="http://localhost:8000"
+            />
+          </label>
+
+          <label>
+            API key
+            <input
+              id="apiKey"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="X-API-Key"
+            />
+          </label>
+
+          <label>
+            System prompt
+            <textarea id="systemPrompt" rows="6"></textarea>
+          </label>
+
+          <div class="actions">
+            <button id="saveSettings" type="button">Lưu</button>
+            <button id="testTools" type="button" class="secondary">Test tools</button>
+          </div>
+
+          <div id="connectionStatus" class="status">Chưa kiểm tra kết nối</div>
+        </section>
+
+        <section class="tools" aria-label="Tools">
+          <h2>Tools</h2>
+          <div id="toolList" class="tool-list">
+            <span class="muted">Bấm Test tools để tải danh sách</span>
+          </div>
+        </section>
+      </aside>
+
+      <section class="chat">
+        <header class="chat-header">
+          <div>
+            <h2>Trợ lý nhập liệu</h2>
+            <p id="chatSubtext">Sẵn sàng nhận yêu cầu</p>
+          </div>
+          <button id="clearChat" type="button" class="secondary">Xóa chat</button>
+        </header>
+
+        <div id="messages" class="messages" aria-live="polite"></div>
+
+        <form id="chatForm" class="composer">
+          <textarea
+            id="messageInput"
+            rows="3"
+            placeholder="Ví dụ: Tạo phiếu nhập kho cho bàn phím cơ 50 cái, NCC ABC..."
+          ></textarea>
+          <button id="sendButton" type="submit">Gửi</button>
+        </form>
+      </section>
+    </main>
+
+    <template id="messageTemplate">
+      <article class="message">
+        <div class="bubble"></div>
+      </article>
+    </template>
+
+    <script src="/ui/app.js"></script>
+  </body>
+</html>

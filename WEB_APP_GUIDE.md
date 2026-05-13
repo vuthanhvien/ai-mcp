@@ -15,6 +15,14 @@ https://saving-alphabetical-accessed-substitute.trycloudflare.com
 
 This URL is temporary. It changes when the quick tunnel restarts.
 
+Open the chatbot UI directly at the same URL:
+
+```text
+https://saving-alphabetical-accessed-substitute.trycloudflare.com/
+```
+
+The UI is public, but `/api/*` and `/mcp` still require `X-API-Key`.
+
 ## Auth
 
 Every public request must include the API key from `.env`:

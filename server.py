@@ -10,7 +10,9 @@ from pathlib import Path
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
+from starlette.responses import FileResponse
 from starlette.responses import JSONResponse
+from starlette.staticfiles import StaticFiles
 from mcp.server.fastmcp import FastMCP
 
 
@@ -44,6 +46,8 @@ mcp = FastMCP("ollama-local")
 class APIKeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         if request.method == "OPTIONS":
+            return await call_next(request)
+        if request.url.path == "/" or request.url.path.startswith("/ui/"):
             return await call_next(request)
         if not API_KEY:
             return await call_next(request)
@@ -355,6 +359,10 @@ async def api_chat(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(ex)}, status_code=500)
 
 
+async def ui_index(request: Request) -> FileResponse:
+    return FileResponse(Path(__file__).parent / "ui" / "index.html")
+
+
 if __name__ == "__main__":
     import sys
 
@@ -363,6 +371,8 @@ if __name__ == "__main__":
     if transport == "http":
         port = int(os.getenv("PORT", "8000"))
         app = mcp.streamable_http_app()
+        app.add_route("/", ui_index, methods=["GET"])
+        app.mount("/ui", StaticFiles(directory=Path(__file__).parent / "ui"), name="ui")
         app.add_route("/api/tools", api_tools, methods=["GET", "OPTIONS"])
         app.add_route("/api/chat", api_chat, methods=["POST", "OPTIONS"])
         app.add_middleware(
