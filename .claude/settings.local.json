@@ -18,7 +18,10 @@
       "PowerShell(cd \"d:\\\\work\\\\ai-mcp\"; $env:PYTHONUTF8=\"1\"; .\\\\.venv\\\\Scripts\\\\python.exe test_mcp.py stdio 2>&1 | Where-Object { $_ -notmatch \"^\\(\\\\s+INFO|\\\\s+WARNING\\)\" })",
       "PowerShell(Get-NetTCPConnection -LocalPort 8001 -State Listen -ErrorAction SilentlyContinue)",
       "PowerShell(Get-Job)",
-      "Bash(awk '{print $2}')"
+      "Bash(awk '{print $2}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; print\\(list\\(json.loads\\(sys.stdin.read\\(\\).split\\('\\\\n'\\)[0]\\).keys\\(\\)\\)\\)\")",
+      "Bash(python3 -)"
     ]
   }
 }
