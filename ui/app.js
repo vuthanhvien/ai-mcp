@@ -62,6 +62,80 @@ function getHeaders() {
   return headers;
 }
 
+function getConnectValues() {
+  const baseUrl = normalizeBaseUrl(els.baseUrl.value);
+  const apiKey = els.apiKey.value.trim() || "YOUR_API_KEY";
+  return {
+    baseUrl,
+    apiKey,
+    streamUrl: `${baseUrl}/api/chat/stream`,
+    chatUrl: `${baseUrl}/api/chat`,
+    toolsUrl: `${baseUrl}/api/tools`,
+    mcpUrl: `${baseUrl}/mcp`,
+  };
+}
+
+function updateConnectGuide() {
+  const values = getConnectValues();
+  els.streamEndpoint.textContent = values.streamUrl;
+  els.mcpEndpoint.textContent = values.mcpUrl;
+  els.authHeader.textContent = `X-API-Key: ${values.apiKey}`;
+  els.mcpConfig.textContent = JSON.stringify(
+    {
+      mcpServers: {
+        "ollama-remote": {
+          type: "http",
+          url: values.mcpUrl,
+          headers: { "X-API-Key": values.apiKey },
+        },
+      },
+    },
+    null,
+    2,
+  );
+  els.fetchExample.textContent = `const res = await fetch("${values.streamUrl}", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "${values.apiKey}"
+  },
+  body: JSON.stringify({
+    messages: [{ role: "user", content: "Tao phieu nhap kho cho 50 ban phim" }],
+    system: "You are a Vietnamese data-entry assistant."
+  })
+});
+
+const reader = res.body.getReader();
+const decoder = new TextDecoder();
+let buffer = "";
+
+while (true) {
+  const { value, done } = await reader.read();
+  if (done) break;
+  buffer += decoder.decode(value, { stream: true });
+  const lines = buffer.split("\\n");
+  buffer = lines.pop() || "";
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const event = JSON.parse(line);
+    if (event.type === "delta") console.log(event.text);
+    if (event.type === "tool_result") console.log("tool", event.name, event.output);
+  }
+}`;
+}
+
+async function copyTextById(id, button) {
+  const target = $(id);
+  const text = target?.textContent || "";
+  if (!text) return;
+  await navigator.clipboard.writeText(text);
+  const original = button.textContent;
+  button.textContent = "Copied";
+  window.setTimeout(() => {
+    button.textContent = original;
+  }, 1200);
+}
+
 function setStatus(text, type = "") {
   els.connectionStatus.textContent = text;
   els.connectionStatus.className = `status ${type}`.trim();
@@ -274,6 +348,14 @@ async function sendMessage(text) {
 
 els.saveSettings.addEventListener("click", saveSettings);
 els.testTools.addEventListener("click", testTools);
+els.refreshGuide.addEventListener("click", updateConnectGuide);
+
+document.querySelectorAll("[data-copy-target]").forEach((button) => {
+  button.addEventListener("click", () => copyTextById(button.dataset.copyTarget, button));
+});
+
+els.baseUrl.addEventListener("input", updateConnectGuide);
+els.apiKey.addEventListener("input", updateConnectGuide);
 
 els.clearChat.addEventListener("click", () => {
   history = [];
@@ -300,6 +382,7 @@ els.messageInput.addEventListener("keydown", (event) => {
 });
 
 loadSettings();
+updateConnectGuide();
 appendMessage(
   "system",
   "Nhập API base URL và API key rồi bấm Test tools. Sau đó bạn có thể chat để nhập liệu hoặc gọi tool.",
